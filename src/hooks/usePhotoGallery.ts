@@ -26,6 +26,28 @@ export async function base64FromPath(path: string): Promise<string> {
 const PHOTO_STORAGE = 'photos';
 
 export function usePhotoGallery() {
+  const [photos, setPhotos] = useState<UserPhoto[]>([]);
+  useEffect(() => {
+    const loadSaved = async () => {
+      const { value } = await Preferences.get({ key: PHOTO_STORAGE });
+
+      const photosInPreferences = (value ? JSON.parse(value) : []) as UserPhoto[];
+      // If running on the web...
+      if (!isPlatform('hybrid')) {
+        for (let photo of photosInPreferences) {
+          const file = await Filesystem.readFile({
+            path: photo.filepath,
+            directory: Directory.Data,
+          });
+          // Web platform only: Load the photo as base64 data
+          photo.webviewPath = `data:image/jpeg;base64,${file.data}`;
+        }
+      }
+      setPhotos(photosInPreferences);
+    };
+    loadSaved();
+  }, []);
+
   const deletePhoto = async (photo: UserPhoto) => {
     // Remove this photo from the Photos reference data array
     const newPhotos = photos.filter((p) => p.filepath !== photo.filepath);
@@ -41,7 +63,7 @@ export function usePhotoGallery() {
     });
     setPhotos(newPhotos);
   };
-  const [photos, setPhotos] = useState<UserPhoto[]>([]);
+
   const savePicture = async (photo: Photo, fileName: string): Promise<UserPhoto> => {
     let base64Data: string;
     // "hybrid" will detect Cordova or Capacitor;
@@ -75,26 +97,7 @@ export function usePhotoGallery() {
       };
     }
   };
-  useEffect(() => {
-    const loadSaved = async () => {
-      const { value } = await Preferences.get({ key: PHOTO_STORAGE });
 
-      const photosInPreferences = (value ? JSON.parse(value) : []) as UserPhoto[];
-      // If running on the web...
-      if (!isPlatform('hybrid')) {
-        for (let photo of photosInPreferences) {
-          const file = await Filesystem.readFile({
-            path: photo.filepath,
-            directory: Directory.Data,
-          });
-          // Web platform only: Load the photo as base64 data
-          photo.webviewPath = `data:image/jpeg;base64,${file.data}`;
-        }
-      }
-      setPhotos(photosInPreferences);
-    };
-    loadSaved();
-  }, []);
   const takePhoto = async () => {
     const photo = await Camera.getPhoto({
       resultType: CameraResultType.Uri,
